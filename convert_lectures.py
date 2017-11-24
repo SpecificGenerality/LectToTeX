@@ -18,7 +18,9 @@ THINGS TO ADD:
     color: default = False
         more emoji support
 """
+import sys
 import os, os.path
+# for scraping MathJax
 from bs4 import BeautifulSoup
 from transcript import Transcript
 from bs4.element import NavigableString
@@ -41,27 +43,31 @@ block_commands = {r'\begin{align*}': r'\end{align*}',  r'\begin{eqnarray*}': r'\
 counter = 1
 week_number = 0
 
-def lecture_html_to_LaTeX(file_in):
+def lect_to_TeX():
     global counter
+    # file to be read
+    file_in = 'C:/Users/Justin Yan/Documents/Development/Python/AoPSCleanScript/lectures_html/Week13HTML.txt'
+    file_out = 'C:/Users/Justin Yan/Documents/Development/Python/AoPSCleanScript/lectures_LaTeX/'
+    image_path = 'C:/Users/Justin Yan/Documents/Development/Python/AoPSCleanScript/lectures_images/'
+    file_name = 'Week13LaTeX.txt'
+    
     #instantiate Transcript object 
     the_transcript = Transcript(file_in)
     #access string instance var containing HTML text
     transcript_text = the_transcript.text
     #BeautifulSoup object allows easier traverse of HTML text
     soup = BeautifulSoup(transcript_text, 'html.parser')
-    
-    file_out_name = file_in.split("/")[9][:-4] + 'LaTeX.txt'
 
-    O = open('C:/Users/Justin Yan/Documents/Development/Python/AoPSCleanScript/AoPSCleanScript/lectures_LaTeX/' + file_out_name, 'w')
+    O = open(file_out + file_name, 'w')
     
-    transcribe_preamble(soup, O)
+    transcribe_preamble(soup, O, image_path)
     
-    transcribe_msgs(soup, O)
+    transcribe_msgs(soup, O, image_path)
     
     O.write(r'\end{document}')
     counter = 0
     
-def transcribe_preamble(soup_in, file_out):
+def transcribe_preamble(soup_in, file_out, image_path):
     global week_number
     
     def transcribe_packages(file_out):
@@ -75,7 +81,7 @@ def transcribe_preamble(soup_in, file_out):
         file_out.write(r'\usepackage[space]{grffile}' + '\n')
         file_out.write(r'\usepackage{float}' + '\n')
         file_out.write(r'\usepackage{tikzsymbols}')
-        file_out.write(r'\graphicspath{ {C:/Users/Justin Yan/Documents/Development/Python/AoPSCleanScript/AoPSCleanScript/lectures_images/} }' + '\n')
+        file_out.write(r'\graphicspath{ {' + image_path + '} }' + '\n')
         file_out.write(r'\usepackage{hyperref}' + '\n')
         file_out.write(r'\hypersetup{' + '\n' + r'colorlinks=true,' + '\n' + r'linkcolor=blue,' + r'filecolor=magenta' + '\n' + 'urlcolor=cyan' + '\n}')
     
@@ -108,7 +114,7 @@ def transcribe_preamble(soup_in, file_out):
     transcribe_title(soup_in, file_out)
     transcribe_start(file_out)
     
-def transcribe_msgs(soup_in, file_out):    
+def transcribe_msgs(soup_in, file_out, image_path):    
     #list holds all of the HTML blocks containing user and  moderator messages
     message_blocks = soup_in.find_all(name='div', attrs={'class':['grid-transcript-row']})
     
@@ -128,11 +134,11 @@ def transcribe_msgs(soup_in, file_out):
         msg_tag = tag.find(name='div', attrs={'class':'msg text'})
         
         #write the message to output file
-        process_message(msg_tag, file_out)
+        process_message(msg_tag, file_out, image_path)
         file_out.write('\n\n')
 
 #write all user and mod messages to the output file
-def process_message(msg_tag, file_out):
+def process_message(msg_tag, file_out, image_path):
 
     #writes the messages that do not contain LaTeX math
     def process_text(child_tag, file_out):
@@ -174,10 +180,10 @@ def process_message(msg_tag, file_out):
         elif child_tag.name == 'script' and 'type' in child_tag.attrs.keys() and child_tag.attrs['type'] == 'math/tex':
             file_out.write(r'$' + child_tag.contents[0] + r'$')
     
-    def process_image(child_tag, file_out):
+    def process_image(child_tag, file_out, image_path):
         
         global counter, week_number
-        save_dir = os.path.abspath('lectures_images')
+        #save_dir = os.path.abspath('lectures_images')
         #extract the image link from its tag
         url = child_tag.attrs['src']
         if 'http' not in url:
@@ -185,12 +191,7 @@ def process_message(msg_tag, file_out):
         #extract the image name from the url
         file_name = week_number + '-' + str(counter) +  '.jpg'
         #complete file path for saved image
-        full_path = os.path.join(save_dir, file_name)
-        #save the image
-# =============================================================================
-#         urllib.urlretrieve(url, full_path)
-# =============================================================================
-        
+        full_path = os.path.join(image_path, file_name)        
         # Download the file from `url` and save it locally under `file_name`:
         with urllib.request.urlopen(url) as response, open(full_path, 'wb') as out_file:
             shutil.copyfileobj(response, out_file)
@@ -218,7 +219,7 @@ def process_message(msg_tag, file_out):
             elif child.name == 'img':
                 print('image found')
                 try:
-                    process_image(child, file_out)
+                    process_image(child, file_out, image_path)
                 except URLError:
                     print(child)
                     continue
